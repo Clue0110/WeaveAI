@@ -176,7 +176,7 @@ def categorize_course_content(course_config: dict, cache_collection_name: str, e
         mdb_collection_name = course_config[module]["submodules"][submodule]["mongo_db_details"]["collection_name"]
         vdb_collection_name = course_config[module]["submodules"][submodule]["vector_db_details"]["collection_name"]
         try:
-            llm_em_model = llm(model=em_model, collection_name=vdb_collection_name)
+            #llm_em_model = llm(model=em_model, collection_name=vdb_collection_name)
             vdb_doc_list=[]
             db_conn = mongo_db()
             for chunk_num in chunk_list:
@@ -185,7 +185,7 @@ def categorize_course_content(course_config: dict, cache_collection_name: str, e
                 db_conn.add_langchain_document(collection_name=mdb_collection_name, document=document)
                 vdb_doc_list.append(document)
             db_conn.close_connection()
-            llm_em_model.add_to_vectorstore(documents=vdb_doc_list)
+            #llm_em_model.add_to_vectorstore(documents=vdb_doc_list)
 
         except Exception as e:
             print(f"Error: categorize_course_content() in adding documents to MongoDB: {e}")

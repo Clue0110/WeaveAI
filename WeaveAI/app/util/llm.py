@@ -11,11 +11,6 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 import json
 
 
-
-import os
-os.environ["GOOGLE_API_KEY"] = "AIzaSyCNtEEXNNQ5UjmoDFexElHdu_pVlFX8yb8"
-
-
 from WeaveAI.app.config import *
 import os
 
