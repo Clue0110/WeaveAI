@@ -23,6 +23,11 @@ def extract_json_from_llm_response(llm_response,model):
     if model=="google":
         json_text=llm_response[7:-3]
         return json.loads(json_text)
+    
+def extract_html_from_llm_response(llm_response,model):
+    if model=="google":
+        html_text=llm_response[8:-3]
+        return html_text
 
 class llm:
     def __init__(self, model="llama", collection_name=None):

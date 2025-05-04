@@ -4,6 +4,7 @@ import requests
 from WeaveAI.app.util.llm import *
 from WeaveAI.app.config import *
 import json
+from WeaveAI.app.core.content_mgmt import *
 #from app.core.llm import llm
 #from app.config import *
 
@@ -15,9 +16,66 @@ def read_root():
     return {"message": "Hello World"}
 
 
-@app.post("/add_course_content_resource")
-def add_course_content(request: Request):
-    pass
+@app.post("/add_resources")
+async def add_course_content(request: Request):
+    # Input needs to have a list of resources
+    # Each array item is of the form {"type":"","url":""}
+    try:
+        resource_list = await request.json()
+        summaries=[]
+        for resource in resource_list:
+            content=cache_content_youtube(resource["url"],collection_name=db_config.course_content_raw,model=llm_preferences.content_cache_embedding_model)
+            summary=generate_summary_with_llm(content=content,model=llm_preferences.course_summarizer_llm)
+            summary.append({"resource":resource, "summary":summary})
+        cache_summary_content_batch(summary_payload_batch=summaries,collection_name=db_config.course_summaries)
+        response_payload={"message":"Successfully Cached Course Content. Ready to generate Course plan"}
+        return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=200)
+    except Exception as e:
+        response_payload={"message":f"Exception in method add_course_content(). Error: {e}"}
+        return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=500)
+
+@app.post("/courseplan")
+async def create_courseplan(request: Request):
+    try:
+        summaries=get_all_summaries_content()
+        summaries_text=[]
+        for summary in summaries:
+            summaries_text.append(summary["summary"])
+        courseplan=generate_courseplan(course_summaries=summaries_text)
+        course_config=create_collection_names(course_config=courseplan)
+        save_course_config(course_config)
+        response_payload={"message":"Successfully Created Course Plan. Ready to generate Course Content"}
+        return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=200)
+    except Exception as e:
+        response_payload={"message":f"Exception in method create_courseplan(). Error: {e}"}
+        return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=500)
+    
+@app.get("/courseplan")
+async def get_courseplan(request: Request):
+    try:
+        course_config=get_course_config()
+        response_payload={"message":"Successfully Fetched Courseplan","data":course_config}
+        return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=200)
+    except Exception as e:
+        response_payload={"message":f"Exception in method get_courseplan(). Error: {e}"}
+        return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=500)
+    
+@app.post("/content")
+async def generate_content(request: Response):
+    try:
+        generate_all_submodule_content()
+        response_payload={"message":"Successfully Created Course Content for all submodules."}
+        return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=200)
+    except Exception as e:
+        response_payload={"message":f"Exception in method generate_content(). Error: {e}"}
+        return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=500)
+    
+
+
+
+
+
+######################################################################################################################################################################################
    
 
 @app.get("/tailor_questionnaire")

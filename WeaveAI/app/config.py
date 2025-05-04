@@ -16,6 +16,9 @@ class llm_preferences:
     course_content_generator_llm="google"
     course_quiz_generator_llm="google"
     course_questtionnaire_generator_llm="google"
+    course_podcast_generator_llm="google"
+    course_summarizer_llm="google"
+    courseplan_generator_llm="google"
 
 class predefined_prompts:
     prompt1="Based on the context {context} ask 3 questions whose answer is either 'YES' or 'NO', to test the user's proficieny on the topics which are prerequists to understand the context For example: If the context is related to linear regression we can as: Do you know statistics concepts like mean and average, we can ask: Do you know about standard deviation. Give it to me in a json format in 'q' 'a' format. I want you not to go beyond what context I have given. Please don't go beyond what is given as context."
@@ -33,15 +36,25 @@ class predefined_prompts:
 
     course_query_prompt="You are an expert educator and skilled at answering questions from students. Your task is to answer a student's question as an educator using the learning material that will be provided. Do not use any information outside the given learning material, and stay relevant. You are not allowed to lie. I want you to directly respond to the student's question. The Teaching Material is as follows: {context}. This is the Chat History you had with the student so far: {chat_history}. Now, using the learning material from the above, answer the following question asked by a student: {query}. Avoid all kinds of markup and only have text in the final response."
 
+    submodule_content_generation_prompt="You are an expert educator and a skilled author. You will be rewriting the provided learning material into a single page, which the Students will use to study. Do not use any information outside the given learning material, and stay relevant. You are not allowed to lie. The response should be an HTML file that will be rendered as a webpage. The learning material is as follows: {context}"
+
+    submodule_quiz_generation_prompt='You are an expert educator and have expertise in creating tests. Your Task is to use the provided learning material and create a quiz with a maximum of 15 multiple-choice questions. Each question has 4 options out of which only one should be correct. Do not use any information outside the given learning material, and stay relevant. You are not allowed to lie. Your response should be a JSON file with the following pattern: {{ "question_number- This is an integer": {{ "question":"Write the question here", "options": {{ "1": <option 1>, "2": <option 2>, "3": <option 3>, "4": <option4> }}, "answer":"<the correct option number>" }} }} The learning material is as follows: {context}'
+
+    generate_podcast_episode_prompt='You are an expert podcast host and have expertise in script writing. Your target audience is students who are going to learn from your podcast. Convert the given learning material into an engaging, conversational podcast script not exceeding 10 minutes. You are the host and are discussing with the Expert. Base the Expert answers only on the provided learning material. The host should ask insightful questions that guide the explanation, clarify complex points, and prompt real-world examples found in the text. Ensure the dialogue sounds natural and is easy to follow for listeners who are Students. Your response must be in the form of a JSON matching the specified structure. The JSON structure must be in the form of {{ "podcastTitle":"the title", "episodeTitle":"title", "segments": [ {{ "speaker":"speaker name", "script":"Script goes here" }} ] }}. Directly respond with the JSON without any additional markup. The learning material is as follows {context}'
+
 class db_config:
     mongo_db_uri = "mongodb://localhost:27017"
     mongo_db_name = "WeaveAI"
     mdb_cache_content_collection_name = "content_cache"
     vdb_cache_content_collection_name = "content_cache"
     mdb_cache_summary_collection_name = "summary_cache"
-    course_config = "course_config"
-    course_quiz = "course_quiz"
+    
+    course_config = "course_config" #Can be referenced using Student ID
+    course_quiz = "course_quiz" # Module Code: quiz_<module>_<submodule>
     course_questionnaire = "course_questionnaire"
+    course_content = "course_content" # Module Code: content_module_submodule
+    course_content_raw = "course_content_cache"
+    course_summaries = "course_summaries"
 
     redis_host="localhost"
     redis_port=6379

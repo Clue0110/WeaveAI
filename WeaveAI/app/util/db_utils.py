@@ -102,6 +102,31 @@ class mongo_db:
             print(f"Error in mongo_db.get_all_langchain_documents() retrieving documents: {e}")
             raise None
     
+    def get_json_documents_with_filter(self, collection_name, filter):
+        """
+        Fetches documents from a specified MongoDB collection based on a filter.
+
+        Args:
+            collection_name: The name of the collection to query within the database.
+            filter: A dictionary specifying the query criteria (e.g., {"field": "value"}).
+                    An empty dictionary {} will match all documents in the collection.
+
+        Returns:
+            A list of documents (as dictionaries) matching the filter criteria.
+            Returns an empty list if no documents match the filter.
+            Returns None if a connection error or operation failure occurs.
+        """
+        if not self.validate_connection():
+            return None
+        try:
+            collection = self.db[collection_name]
+            document_cursor=collection.find(filter)
+            documents_list=list(document_cursor)
+            return documents_list
+        except Exception as e:
+            print(f"Error in mongo_db.get_json_documents_with_filter() retrieving documents: {e}")
+            raise None
+    
     def get_all_json_documents(self, collection_name):
         if not self.validate_connection():
             return None

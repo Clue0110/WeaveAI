@@ -36,7 +36,6 @@ def cache_summary_content(summary_payload: json, collection_name: str):
     Cache the summary content into the MongoDB database.
     :param summary: The summary content to cache.
     :param collection_name: The name of the collection in MongoDB.
-    :return: A dictionary containing the summary and collection name.
     """
     # TEST: Insert the summary into the MongoDB Database
     try:
@@ -62,8 +61,18 @@ def cache_summary_content_batch(summary_payload_batch: list, collection_name: st
     except Exception as e:
         print(f"Error: cache_summary_content_batch() in caching content to MongoDB: {e}")
         return None
+    
+def get_all_summaries_content():
+    try:
+        db_conn = mongo_db()
+        summaries=db_conn.get_all_json_documents(collection_name=db_config.course_summaries)
+        db_conn.close_connection()
+        return summaries
+    except Exception as e:
+        print(f"Error: cache_summary_content() in caching content to MongoDB: {e}")
+        return None
 
-def generate_courseplan(course_summaries: list, model: str):
+def generate_courseplan(course_summaries: list, model: str = llm_preferences.courseplan_generator_llm):
     """
     Generate a course plan based on the provided course summaries.
     :param course_summaries: List of course summaries.
@@ -97,7 +106,7 @@ def create_collection_names(course_config: dict):
         }
         course_config[module]["vector_db_details"]=module_vector_db_details
         for submodule in course_config[module]["submodules"]:
-            submodule_collection_name="VDB_S_"+module+"_"+submodule
+            submodule_collection_name="MDB_S_"+module+"_"+submodule
             submodule_vector_db_details={
                 "collection_name": submodule_collection_name,
                 "num_chunks":0,
@@ -191,8 +200,139 @@ def categorize_course_content(course_config: dict, cache_collection_name: str, e
             print(f"Error: categorize_course_content() in adding documents to MongoDB: {e}")
             return None
 
+    return course_config
+
+def save_course_config(course_config):
+    try:
+        db_conn=mongo_db()
+        db_conn.add_json(collection_name=db_config.course_config,json_document=course_config)
+        db_conn.close_connection()
+    except Exception as e:
+        print(f"Error: save_course_content() in adding documents to MongoDB: {e}")
+        return None
     return True
 
-    
+def get_course_config(course_config):
+    try:
+        db_conn=mongo_db()
+        course_config=db_conn.get_all_json_documents(collection_name=db_config.course_config)
+        db_conn.close_connection()
+        return course_config[0]
+    except Exception as e:
+        print(f"Error: save_course_content() in adding documents to MongoDB: {e}")
+        return None
 
+def generate_submodule_content(module=None, submodule=None, mdb_collection_name=None):
+    try:
+        db_conn=mongo_db()
+        raw_content_documents=db_conn.get_all_langchain_documents(collection_name=mdb_collection_name)
+        db_conn.close_connection()
+    except Exception as e:
+        print(f"Error: generate_submodule_content(): {e}")
+        return None
+
+    raw_content=""
+    for doc in raw_content_documents:
+        raw_content+=doc.page_content
+
+    content_llm=llm(model=llm_preferences.course_content_generator_llm)
+    llm_response=content_llm.execute_llm_query(template=predefined_prompts.submodule_content_generation_prompt,params={"context":raw_content})
+    # Extract HTML from response
+    html_content=extract_html_from_llm_response(llm_response, llm_preferences.course_content_generator_llm)
+    return html_content
+
+def save_submodule_content(module_code,html_content):
+    try:
+        db_conn=mongo_db()
+        db_conn.add_json(collection_name=db_config.course_content,json_document={"module_code":module_code,"html_content":html_content})
+        db_conn.close_connection()
+    except Exception as e:
+        print(f"Error: save_submodule_content(): {e}")
+        return None 
+    
+def get_submodule_content(module_code):
+    # Create a filter and fetch submodule content
+    try:
+        db_conn=mongo_db()
+        course_content=db_conn.get_json_documents_with_filter(collection_name=db_config.course_content, filter={"module_code":module_code})
+        db_conn.close_connection()
+        return course_content["html_content"]
+    except Exception as e:
+        print(f"Error: get_submodule_content(): {e}")
+        return None 
+
+def generate_all_submodule_content():
+    # Get course_config
+    try:
+        db_conn=mongo_db()
+        course_config=db_conn.get_all_json_documents()[0]
+        db_conn.close_connection()
+    except Exception as e:
+        print(f"Error: generate_all_submodule_content(): {e}")
+        return None
+    # Iterate over each module and submodule
+    for module in course_config:
+        for submodule in course_config[module]["submodules"]:
+            curr_submodule_content=generate_submodule_content(module, submodule, course_config[module]["submodules"][submodule]["mongo_db_details"]["collection_name"])
+            # Save this content into DB with ID: content_<module>_<submodule>
+            save_submodule_content(module_code=f"content_{module}_{submodule}", html_content=curr_submodule_content)
+    # For each module and
+
+def generate_submodule_quiz(module=None, submodule=None,mdb_collection_name=None):
+    try:
+        db_conn=mongo_db()
+        raw_content_documents=db_conn.get_all_langchain_documents(collection_name=mdb_collection_name)
+        db_conn.close_connection()
+    except Exception as e:
+        print(f"Error: generate_submodule_content(): {e}")
+        return None
+
+    raw_content=""
+    for doc in raw_content_documents:
+        raw_content+=doc.page_content
+
+    content_llm=llm(model=llm_preferences.course_quiz_generator_llm)
+    llm_response=content_llm.execute_llm_query(template=predefined_prompts.submodule_quiz_generation_prompt,params={"context":raw_content})
+    # Extract JSON from response
+    json_content=extract_json_from_llm_response(llm_response, llm_preferences.course_quiz_generator_llm)
+    return json_content
+
+def save_submodule_quiz(module_code,json_content):
+    try:
+        db_conn=mongo_db()
+        db_conn.add_json(collection_name=db_config.course_quiz,json_document={"module_code":module_code,"json_content":json_content})
+        db_conn.close_connection()
+    except Exception as e:
+        print(f"Error: save_submodule_quiz(): {e}")
+        return None 
+    
+def get_submodule_quiz(module_code):
+    # Create a filter and fetch submodule content
+    try:
+        db_conn=mongo_db()
+        course_quiz=db_conn.get_json_documents_with_filter(collection_name=db_config.course_quiz, filter={"module_code":module_code})
+        db_conn.close_connection()
+        return course_quiz["json_content"]
+    except Exception as e:
+        print(f"Error: get_submodule_quiz(): {e}")
+        return None 
+
+def generate_podcast_episode(module=None,sub_module=None,mdb_collection_name=None):
+    try:
+        db_conn=mongo_db()
+        raw_content_documents=db_conn.get_all_langchain_documents(collection_name=mdb_collection_name)
+        db_conn.close_connection()
+    except Exception as e:
+        print(f"Error: generate_submodule_content(): {e}")
+        return None
+
+    raw_content=""
+    for doc in raw_content_documents:
+        raw_content+=doc.page_content
+
+    podcast_llm=llm(model=llm_preferences.course_podcast_generator_llm)
+    llm_response=podcast_llm.execute_llm_query(template=predefined_prompts.generate_podcast_episode_prompt,params={"context":raw_content})
+    # Extract JSON from response
+    json_content=extract_json_from_llm_response(llm_response, llm_preferences.course_podcast_generator_llm)
+    return json_content
 
