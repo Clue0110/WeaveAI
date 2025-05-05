@@ -4,6 +4,9 @@ PROJECT_ROOT=os.path.dirname(os.path.abspath(__file__))
 
 class application_config:
     chroma_db_parent_path=os.path.join(PROJECT_ROOT,"util","db","chroma")
+    host_speaker_tts="tts_models/en/ljspeech/tacotron2-DDC"
+    expert_speaker_tts="tts_models/en/jenny/jenny"
+    podcast_path_prefix="podcast_"
 
 class llm_config:
     chat_history_redis_key="chat_history"

@@ -8,7 +8,7 @@ import io
 from WeaveAI.app.core.content_mgmt import *
 from WeaveAI.app.core.chatbot import *
 import logging
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 import speech_recognition as sr
 from pydub import AudioSegment
 from gtts import gTTS
@@ -164,7 +164,6 @@ async def get_chatbot_response(request: Request):
         return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=500)
 
 #TODO: Convert the podcast JSON to a voice file
-#TODO: Voicebot get
 
 def transcribe_audio(audio_bytes: bytes, language: str = "en-US") -> str:
     """
@@ -262,6 +261,31 @@ async def get_chatbot_voice_response(
             'Content-Disposition': 'inline; filename="response.mp3"'
         }
     )
+
+@app.post("/podcast")
+async def post_podcast(request: Request):
+    try:
+        request_payload=await request.json()
+        module=request_payload["module"]
+        submodule=request_payload["submodule"]
+        module_code=f"podcast_{module}_{submodule}"
+        course_config=get_course_config()
+        collection_name=course_config[module]["submodules"][submodule]["mongo_db_details"]
+        podcast_path=create_podcast(module=module,sub_module=submodule,mdb_collection_name=collection_name)
+
+        logger.info(f"File found. Sending '{podcast_path}'...")
+        return FileResponse(
+            path=podcast_path,
+            media_type='audio/mpeg', # Explicitly set MIME type for robustness
+            filename=os.path.basename(podcast_path) # Sets the filename in Content-Disposition header
+            # Optional: Control Content-Disposition more explicitly if needed
+            # headers={"Content-Disposition": f"attachment; filename={os.path.basename(PODCAST_FILE_PATH)}"} # Force download
+            # headers={"Content-Disposition": f"inline; filename={os.path.basename(PODCAST_FILE_PATH)}"} # Suggest inline playback
+        )
+        #return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=200)
+    except Exception as e:
+        logger.error(f"Error in post_podcast(): {e}")
+        raise HTTPException(status_code=500, detail=f"Server Error: {e}")
 
 ######################################################################################################################################################################################
 

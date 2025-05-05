@@ -2,6 +2,11 @@ from WeaveAI.app.util.video_utils import youtube_extract_transcript
 from WeaveAI.app.util.llm import *
 from WeaveAI.app.config import *
 from WeaveAI.app.util.db_utils import *
+import torch
+from TTS.api import TTS
+from pydub import AudioSegment
+import tempfile
+import os
 
 def cache_content_youtube(url: str, collection_name: str, model: str):
     #video_transcript=youtube_extract_transcript(url)
@@ -336,3 +341,76 @@ def generate_podcast_episode(module=None,sub_module=None,mdb_collection_name=Non
     json_content=extract_json_from_llm_response(llm_response, llm_preferences.course_podcast_generator_llm)
     return json_content
 
+def initialize_podcast_speakers():
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Using device: {device}")
+    speaker_info={
+        "Host":{
+            "model":application_config.host_speaker_tts,
+            "tts":TTS(model_name=application_config.host_speaker_tts, progress_bar=True).to(device)
+        },
+        "Expert":{
+            "model":application_config.expert_speaker_tts,
+            "tts":TTS(model_name=application_config.expert_speaker_tts, progress_bar=True).to(device)
+        }
+    }
+    return speaker_info
+
+def convert_script_to_speech(role: str, text: str, temp_dir: str, speaker_info: dict):
+    """Synthesizes speech using Voice A, saves to temp file, returns path."""
+    try:
+        output_path = os.path.join(temp_dir, f"{role}_speaker_{hash(text)}.wav")
+        print(f"Synthesizing ({role}) to {output_path}...")
+        speaker_info[role]["tts"].tts_to_file(text=text, file_path=output_path)
+        print(f"Synthesis {role} complete.")
+        return output_path
+    except Exception as e:
+        print(f"Error synthesizing speech for Speaker {role}: {e}")
+        return None
+
+def create_podcast(module=None,sub_module=None,mdb_collection_name=None):
+    podcast_payload=generate_podcast_episode(module,sub_module,mdb_collection_name)
+    speaker_info=initialize_podcast_speakers()
+    podcast_path=create_podcast_mp3(podcast_payload["segments"], speaker_info, f"{module}_{sub_module}")
+    return podcast_path
+
+def create_podcast_mp3(podcast_segments,speaker_info,file_suffix):
+    # Use pydub to combine segments
+    final_audio = AudioSegment.empty()
+    silence_between_speakers = AudioSegment.silent(duration=500) # 0.5 seconds silence
+    output_filename = f"{application_config.podcast_path_prefix}_{file_suffix}.mp3"
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        print(f"Created temporary directory: {temp_dir}")
+        print("Starting audio generation...")
+
+        for i, segment_obj in enumerate(podcast_segments):
+            speaker = segment_obj["speaker"]
+            script = segment_obj["script"]
+            segment_path = None
+            segment = None
+
+            print(f"\nProcessing line {i+1}/{len(podcast_segments)}: Speaker {speaker}")
+            segment_path=convert_script_to_speech(role=speaker,text=script,temp_dir=temp_dir, speaker_info=speaker_info)
+
+            if segment_path and os.path.exists(segment_path):
+                try:
+                    # Load the generated WAV file using pydub
+                    segment = AudioSegment.from_wav(segment_path)
+                    # Add the segment and silence to the final audio
+                    final_audio += segment + silence_between_speakers
+                    print(f"Appended segment for line {i+1}.")
+                    # No need to manually delete here, tempfile module handles the directory
+                except Exception as e:
+                    print(f"Error loading/appending segment from {segment_path}: {e}")
+            else:
+                print(f"Skipping segment for line {i+1} due to synthesis error.")
+        print("\nAudio generation complete. Exporting...")
+        # Export the final combined audio
+        try:
+            final_audio.export(output_filename, format="mp3")
+            print(f"Podcast audio saved as {output_filename}")
+        except Exception as e:
+            print(f"Error exporting final audio: {e}")
+    return output_filename
+    
