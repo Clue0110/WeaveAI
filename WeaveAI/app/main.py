@@ -1,13 +1,24 @@
-from fastapi import FastAPI, HTTPException, Response, status, Request
+from fastapi import FastAPI, HTTPException, Response, status, Request, File, UploadFile
 from pydantic import BaseModel
 import requests
 from WeaveAI.app.util.llm import *
 from WeaveAI.app.config import *
 import json
+import io
 from WeaveAI.app.core.content_mgmt import *
-#from app.core.llm import llm
-#from app.config import *
+from WeaveAI.app.core.chatbot import *
+import logging
+from fastapi.responses import StreamingResponse
+import speech_recognition as sr
+from pydub import AudioSegment
+from gtts import gTTS
 
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -70,77 +81,190 @@ async def generate_content(request: Response):
         response_payload={"message":f"Exception in method generate_content(). Error: {e}"}
         return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=500)
     
+@app.get("/content")
+async def get_submodule_content(request: Request):
+    try:
+        request_payload=await request.json()
+        module=request_payload["module"]
+        submodule=request_payload["submodule"]
+        module_code=f"content_{module}_{submodule}"
+        content=get_submodule_content(module_code=module_code)
+        response_payload={"message":"Succesfully Retrieved Submodule Payload",
+                          "content":content}
+        return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=200)
+    except Exception as e:
+        response_payload={"message":f"Exception in get__submodule_content(). Error: {e}"}
+        return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=500)
+    
+@app.post("/quiz")
+async def generate_quiz(request: Request):
+    try:
+        request_payload=await request.json()
+        module=request_payload["module"]
+        submodule=request_payload["submodule"]
+        save_quiz=request_payload["save"]
+        module_code=f"quiz_{module}_{submodule}"
+        course_config=get_course_config()
+        collection_name=course_config[module]["submodules"][submodule]["mongo_db_details"]
+        quiz_content=generate_submodule_quiz(collection_name)
+        if save_quiz==True:
+            save_submodule_quiz(module_code=module_code, json_content=quiz_content)
+        response_payload={"message":"Succesfully Retrieved Submodule Quiz",
+                          "content":quiz_content,
+                          "save":save_quiz}
+        return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=200)
+    except Exception as e:
+        response_payload={"message":f"Exception in generate_quiz(). Error: {e}"}
+        return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=500)
+    
+@app.get("/quiz")
+async def get_quiz(request: Request):
+    try:
+        request_payload=await request.json()
+        module=request_payload["module"]
+        submodule=request_payload["submodule"]
+        module_code=f"quiz_{module}_{submodule}"
+        quiz_content=get_submodule_quiz(module_code=module_code)
+        response_payload={"message":"Succesfully Retrieved Submodule Quiz",
+                          "content":quiz_content}
+        return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=200)
+    except Exception as e:
+        response_payload={"message":f"Exception in get_quiz(). Error: {e}"}
+        return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=500)
 
+@app.get("/podcast")
+async def get_quiz(request: Request):
+    try:
+        request_payload=await request.json()
+        module=request_payload["module"]
+        submodule=request_payload["submodule"]
+        module_code=f"podcast_{module}_{submodule}"
+        course_config=get_course_config()
+        collection_name=course_config[module]["submodules"][submodule]["mongo_db_details"]
+        podcast_content=generate_podcast_episode(module=module,sub_module=submodule,mdb_collection_name=collection_name)
+        response_payload={"message":"Succesfully Retrieved Submodule Quiz",
+                          "content":podcast_content}
+        return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=200)
+    except Exception as e:
+        response_payload={"message":f"Exception in get_quiz(). Error: {e}"}
+        return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=500)
+    
+@app.get("/chatbot")
+async def get_chatbot_response(request: Request):
+    try:
+        request_payload=await request.json()
+        #print(request_payload,type(request_payload))
+        query=request_payload["query"]
+        query_response=answer_course_query(query=query, with_history=True)
+        response_payload={"message":"Succesfully Retrieved Response From Chatbot",
+                          "response":query_response}
+        return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=200)
+    except Exception as e:
+        response_payload={"message":f"Exception in get_chatbot_response(). Error: {e}"}
+        return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=500)
 
+#TODO: Convert the podcast JSON to a voice file
+#TODO: Voicebot get
 
+def transcribe_audio(audio_bytes: bytes, language: str = "en-US") -> str:
+    """
+    Transcribes audio bytes to text using SpeechRecognition.
+    Handles audio format conversion using pydub.
+    """
+    recognizer = sr.Recognizer()
+    try:
+        # Load audio data from bytes using pydub
+        # This automatically detects the format (wav, mp3, ogg, etc. if ffmpeg is installed)
+        audio_segment = AudioSegment.from_file(io.BytesIO(audio_bytes))
 
+        # Export to WAV format in memory, as Recognizer prefers WAV
+        wav_io = io.BytesIO()
+        audio_segment.export(wav_io, format="wav")
+        wav_io.seek(0) # Reset buffer position to the beginning
+
+        # Use the WAV data with SpeechRecognition AudioFile
+        with sr.AudioFile(wav_io) as source:
+            audio_data = recognizer.record(source) # Read the entire audio file
+
+        # Recognize speech using Google Web Speech API (requires internet)
+        # Other engines like recognize_whisper (offline, needs setup) or
+        # recognize_sphinx (offline, less accurate) can be used.
+        logger.info(f"Attempting to transcribe audio using Google Web Speech API (language: {language})...")
+        text = recognizer.recognize_google(audio_data, language=language)
+        logger.info(f"Transcription successful: {text}")
+        return text
+
+    except sr.UnknownValueError:
+        logger.error("Speech Recognition could not understand audio")
+        raise HTTPException(status_code=400, detail="Could not understand audio")
+    except sr.RequestError as e:
+        logger.error(f"Could not request results from Speech Recognition service; {e}")
+        raise HTTPException(status_code=503, detail=f"Speech Recognition service unavailable: {e}")
+    except Exception as e:
+        # Catch other potential errors (e.g., pydub format issues)
+        logger.error(f"Error during audio processing or transcription: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error processing audio: {e}")
+    
+def synthesize_speech(text: str, language: str = "en") -> io.BytesIO:
+    """
+    Converts text to speech audio bytes (MP3 format) using gTTS.
+    """
+    try:
+        logger.info(f"Synthesizing speech for text: {text} (language: {language})")
+        tts = gTTS(text=text, lang=language, slow=False)
+        audio_fp = io.BytesIO()
+        tts.write_to_fp(audio_fp)
+        audio_fp.seek(0) # Rewind the buffer
+        logger.info("Speech synthesis successful.")
+        return audio_fp
+    except Exception as e:
+        logger.error(f"Error during speech synthesis: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to synthesize speech: {e}")
+
+@app.post("/chatbot")
+async def get_chatbot_voice_response(
+    request: Request, # Access request details if needed (e.g., headers)
+    audio_file: UploadFile = File(..., description="Voice note file (e.g., wav, mp3, m4a)")):
+
+    try:
+        audio_bytes = await audio_file.read()
+        if not audio_bytes:
+            raise HTTPException(status_code=400, detail="Received empty audio file.")
+        logger.info(f"Read {len(audio_bytes)} bytes from uploaded file.")
+    except Exception as e:
+        logger.error(f"Error reading upload file: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail=f"Error reading audio file: {e}")
+    finally:
+        await audio_file.close() # Ensure file handle is closed
+
+    transcribed_text = transcribe_audio(audio_bytes, language="en-US") # Example language
+
+    try:
+        llm_response_text = answer_course_query(query=transcribed_text, with_history=True)
+        if not llm_response_text:
+             # Handle cases where LLM gives no response gracefully
+             logger.warning("LLM returned an empty response.")
+             # Decide how to handle: maybe synthesize a default message?
+             llm_response_text = "I don't have a response for that right now."
+             # Or raise an error:
+             # raise HTTPException(status_code=500, detail="LLM failed to generate a response.")
+    except Exception as e:
+        logger.error(f"Error getting response from LLM function: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"LLM interaction failed: {e}")
+    
+    response_audio_fp = synthesize_speech(llm_response_text, language="en")
+    logger.info("Streaming synthesized audio response.")
+    return StreamingResponse(
+        response_audio_fp,
+        media_type="audio/mpeg", # gTTS produces MP3
+        headers={
+            # Optional: Suggest a filename to the client
+            'Content-Disposition': 'inline; filename="response.mp3"'
+        }
+    )
 
 ######################################################################################################################################################################################
-   
 
-@app.get("/tailor_questionnaire")
-def get_tailor_questionnaire():
-    llm_query=predefined_prompts.prompt1
-    data_retrieval_query=predefined_prompts.prompt2
-    gemini_llm=llm(model="google")
-    gemini_llm.initialize_retriever(search_kwargs={"k":1000000})
-    context=gemini_llm.fetch_data(data_retrieval_query)
-    # Executing LLM Query
-    llm_response=gemini_llm.execute_llm_query(template=llm_query,params={"context":str(context)})
-    # Extract QA JSON from LLM Response
-    qa_json=extract_json_from_llm_response(llm_response,"google")
-    
-    # Send the QA JSON to UI
-    http_response={"message":qa_json}
-    #return http_response
-    return Response(content=json.dumps(http_response,indent=4), media_type="application/json")
-
-@app.post("/tailor_questionnaire")
-async def store_tailor_questionnaire(request: Request):
-    #Read the JSON from POST payload
-    qa_json= await request.json()
-
-    #Store this QA json in database
-    with open("questionnaire.json", "w") as json_file:
-        json.dump(qa_json, json_file, indent=4)
-    
-    return {"message": "Questionnaire saved successfully.", "data": qa_json}
-
-@app.get("/questionnaire")
-def get_questionnaire():
-    with open("questionnaire.json", "r") as json_file:
-        data = json.load(json_file)
-    return data
-
-@app.get("/generate_courseplan")
-def generate_courseplan():
-    # get the QA content from database
-    with open("questionnaire.json", "r") as json_file:
-        qa_data = json_file.read()
-
-    data_retrieval_query=predefined_prompts.prompt3
-    gemini_llm=llm(model="google")
-    gemini_llm.initialize_retriever(search_kwargs={"k":1000000})
-    context=gemini_llm.fetch_data(data_retrieval_query)
-
-    llm_query=predefined_prompts.prompt4
-    llm_response=gemini_llm.execute_llm_query(template=llm_query,params={"context":str(context),"qa_data":str(qa_data),"time":"5"})
-    #Extract json from LLM Response
-    course_plan_json=extract_json_from_llm_response(llm_response,"google")
-    #Store this course plan JSON in database
-    with open("courseplan.json", "w") as json_file:
-        json.dump(course_plan_json, json_file, indent=4)
-    #Send the JSON to UI
-    return Response(content=json.dumps(course_plan_json,indent=4), media_type="application/json")
-
-@app.get("/courseplan")
-def get_courseplan():
-    # get the course plan content from database
-    # Send the JSON to UI
-
-    with open("courseplan.json", "r") as json_file:
-        data = json.load(json_file)
-    return data
 
 
 

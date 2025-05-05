@@ -212,7 +212,7 @@ def save_course_config(course_config):
         return None
     return True
 
-def get_course_config(course_config):
+def get_course_config():
     try:
         db_conn=mongo_db()
         course_config=db_conn.get_all_json_documents(collection_name=db_config.course_config)

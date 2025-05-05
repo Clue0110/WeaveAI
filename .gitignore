@@ -4,3 +4,4 @@
 startup_commands.py
 WeaveAI/app/util/db/
 test*
+.env
