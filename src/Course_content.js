@@ -33,7 +33,7 @@ function CourseContent() {
       <div className="navbar">
         <div className="navbar-container">
           <div className="navbar-logo">
-            <span>📘</span> <strong>LearnHub</strong>
+            <span>📘</span> <strong>WeaveAI</strong>
           </div>
           <div className="navbar-links">
             <a href="#">Home</a>
@@ -149,12 +149,13 @@ function CourseContent() {
                             console.log("Fine0")
                             const response = await axios.post('/podcast', {
                                 module: module.module_number,
-                                submodule: lesson.module_number
-                              //responseType: 'blob'
-                            });
+                                submodule: lesson.module_number},{
+                              responseType: 'blob'}
+                            );
                             console.log("Fine1")
                             const filename = `podcast_module${module.module_number}_submodule${lesson.module_number}.mp3`;
                             console.log("Fine2")
+                            console.log(response.data)
                             saveAs(response.data, filename);
                           } catch (error) {
                             console.error('Podcast download failed:', error);

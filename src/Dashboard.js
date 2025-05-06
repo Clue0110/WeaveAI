@@ -46,7 +46,7 @@ function Dashboard() {
   return (
     <div className="dashboard">
       <header className="header">
-        <div className="logo">📖 LearnHub</div>
+        <div className="logo">📖 WeaveAI</div>
         <nav className="nav-links">
           <a href="#">Home</a>
           <a href="#">Courses</a>
