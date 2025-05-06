@@ -22,6 +22,7 @@ class llm_preferences:
     course_podcast_generator_llm="google"
     course_summarizer_llm="google"
     courseplan_generator_llm="google"
+    course_categorizer_llm="google"
 
 class predefined_prompts:
     prompt1="Based on the context {context} ask 3 questions whose answer is either 'YES' or 'NO', to test the user's proficieny on the topics which are prerequists to understand the context For example: If the context is related to linear regression we can as: Do you know statistics concepts like mean and average, we can ask: Do you know about standard deviation. Give it to me in a json format in 'q' 'a' format. I want you not to go beyond what context I have given. Please don't go beyond what is given as context."

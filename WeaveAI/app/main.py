@@ -32,12 +32,12 @@ async def add_course_content(request: Request):
     # Input needs to have a list of resources
     # Each array item is of the form {"type":"","url":""}
     try:
-        resource_list = await request.json()
+        resources = await request.json()
         summaries=[]
-        for resource in resource_list:
+        for resource in resources["resource_list"]:
             content=cache_content_youtube(resource["url"],collection_name=db_config.course_content_raw,model=llm_preferences.content_cache_embedding_model)
             summary=generate_summary_with_llm(content=content,model=llm_preferences.course_summarizer_llm)
-            summary.append({"resource":resource, "summary":summary})
+            summaries.append({"resource":resource, "summary":summary})
         cache_summary_content_batch(summary_payload_batch=summaries,collection_name=db_config.course_summaries)
         response_payload={"message":"Successfully Cached Course Content. Ready to generate Course plan"}
         return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=200)
@@ -61,10 +61,22 @@ async def create_courseplan(request: Request):
         response_payload={"message":f"Exception in method create_courseplan(). Error: {e}"}
         return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=500)
     
+@app.post("/setup_course")
+async def setup_course(request: Request):
+    try:
+        course_config=get_course_config()
+        course_config.pop("_id",None)
+        categorize_course_content(course_config=course_config)
+        response_payload={"message":"Successfully Fetched Courseplan","data":course_config}
+    except Exception as e:
+        response_payload={"message":f"Exception in method create_courseplan(). Error: {e}"}
+        return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=500)
+    
 @app.get("/courseplan")
 async def get_courseplan(request: Request):
     try:
-        course_config=get_course_config()
+        course_config=get_course_config() #Debug
+        course_config.pop("_id",None)
         response_payload={"message":"Successfully Fetched Courseplan","data":course_config}
         return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=200)
     except Exception as e:
@@ -88,7 +100,8 @@ async def get_submodule_content(request: Request):
         module=request_payload["module"]
         submodule=request_payload["submodule"]
         module_code=f"content_{module}_{submodule}"
-        content=get_submodule_content(module_code=module_code)
+        content=fetch_submodule_content(module_code)
+        print(content)
         response_payload={"message":"Succesfully Retrieved Submodule Payload",
                           "content":content}
         return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=200)
@@ -102,13 +115,21 @@ async def generate_quiz(request: Request):
         request_payload=await request.json()
         module=request_payload["module"]
         submodule=request_payload["submodule"]
+        print("Here1")
         save_quiz=request_payload["save"]
+        print("Here2")
         module_code=f"quiz_{module}_{submodule}"
+        print("Here3")
         course_config=get_course_config()
-        collection_name=course_config[module]["submodules"][submodule]["mongo_db_details"]
-        quiz_content=generate_submodule_quiz(collection_name)
+        course_config.pop("_id",None)
+        print("Here4")
+        collection_name=course_config[str(module)]["submodules"][str(submodule)]["mongo_db_details"]["collection_name"]
+        print("Here5")
+        quiz_content=generate_submodule_quiz(mdb_collection_name=collection_name)
+        print(f"Generated Submodule Quiz for {module_code}")
         if save_quiz==True:
             save_submodule_quiz(module_code=module_code, json_content=quiz_content)
+            print(f"Saved Quiz: {module_code}")
         response_payload={"message":"Succesfully Retrieved Submodule Quiz",
                           "content":quiz_content,
                           "save":save_quiz}
@@ -133,14 +154,14 @@ async def get_quiz(request: Request):
         return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=500)
 
 @app.get("/podcast")
-async def get_quiz(request: Request):
+async def get_podcast_script(request: Request):
     try:
         request_payload=await request.json()
         module=request_payload["module"]
         submodule=request_payload["submodule"]
         module_code=f"podcast_{module}_{submodule}"
         course_config=get_course_config()
-        collection_name=course_config[module]["submodules"][submodule]["mongo_db_details"]
+        collection_name=course_config[str(module)]["submodules"][str(submodule)]["mongo_db_details"]["collection_name"]
         podcast_content=generate_podcast_episode(module=module,sub_module=submodule,mdb_collection_name=collection_name)
         response_payload={"message":"Succesfully Retrieved Submodule Quiz",
                           "content":podcast_content}
@@ -162,8 +183,6 @@ async def get_chatbot_response(request: Request):
     except Exception as e:
         response_payload={"message":f"Exception in get_chatbot_response(). Error: {e}"}
         return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=500)
-
-#TODO: Convert the podcast JSON to a voice file
 
 def transcribe_audio(audio_bytes: bytes, language: str = "en-US") -> str:
     """

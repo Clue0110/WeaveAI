@@ -124,7 +124,7 @@ def create_collection_names(course_config: dict):
             course_config[module]["submodules"][submodule]["mongo_db_details"]=submodule_content_details
     return course_config
 
-def categorize_course_content(course_config: dict, cache_collection_name: str, em_model=None, model="google"):
+def categorize_course_content(course_config: dict, cache_collection_name=db_config.course_content_raw, em_model=llm_preferences.content_cache_embedding_model, model=llm_preferences.course_categorizer_llm):
     """
     Categorize the course content based on the provided configuration and cache content.
     :param course_config: The course configuration dictionary.
@@ -148,7 +148,7 @@ def categorize_course_content(course_config: dict, cache_collection_name: str, e
                 "submodule_name": course_config[module]["submodules"][submodule]["module_title"],
                 "module_name": course_config[module]["module_title"]
             }
-
+    print("Created Course Map")
     all_chunks = {}
     try:
         db_conn = mongo_db()
@@ -162,7 +162,7 @@ def categorize_course_content(course_config: dict, cache_collection_name: str, e
     except Exception as e:
         print(f"Error: categorize_course_content() in fetching cached content from MongoDB: {e}")
         return None
-    
+    print("Fetched All Chunks")
     # Categorize Content
     # Module Collection name can be accessed by
     # module, submodule = module_code.split("_")
@@ -204,7 +204,7 @@ def categorize_course_content(course_config: dict, cache_collection_name: str, e
         except Exception as e:
             print(f"Error: categorize_course_content() in adding documents to MongoDB: {e}")
             return None
-
+    print("Finished Categorizing Course Content")
     return course_config
 
 def save_course_config(course_config):
@@ -255,11 +255,11 @@ def save_submodule_content(module_code,html_content):
         print(f"Error: save_submodule_content(): {e}")
         return None 
     
-def get_submodule_content(module_code):
+def fetch_submodule_content(module_code=None):
     # Create a filter and fetch submodule content
     try:
         db_conn=mongo_db()
-        course_content=db_conn.get_json_documents_with_filter(collection_name=db_config.course_content, filter={"module_code":module_code})
+        course_content=db_conn.get_json_documents_with_filter(collection_name=db_config.course_content, filter={"module_code":module_code})[0]
         db_conn.close_connection()
         return course_content["html_content"]
     except Exception as e:
@@ -270,7 +270,8 @@ def generate_all_submodule_content():
     # Get course_config
     try:
         db_conn=mongo_db()
-        course_config=db_conn.get_all_json_documents()[0]
+        course_config=db_conn.get_all_json_documents(collection_name=db_config.course_config)[0]
+        course_config.pop("_id",None)
         db_conn.close_connection()
     except Exception as e:
         print(f"Error: generate_all_submodule_content(): {e}")
@@ -315,7 +316,7 @@ def get_submodule_quiz(module_code):
     # Create a filter and fetch submodule content
     try:
         db_conn=mongo_db()
-        course_quiz=db_conn.get_json_documents_with_filter(collection_name=db_config.course_quiz, filter={"module_code":module_code})
+        course_quiz=db_conn.get_json_documents_with_filter(collection_name=db_config.course_quiz, filter={"module_code":module_code})[-1]
         db_conn.close_connection()
         return course_quiz["json_content"]
     except Exception as e:
