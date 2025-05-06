@@ -51,10 +51,10 @@ const UploadInterface = () => {
 
     try {
       console.log(payload);
-      await axios.post('/add_resource', payload);
+      await axios.post('/add_resources', payload);
       console.log('Added resource links:');
 
-      await axios.post('/trigger_course_plan', {});
+      await axios.post('/courseplan', {});
       console.log('CoursePlan triggered');
 
       await axios.post('/setup_course', {});

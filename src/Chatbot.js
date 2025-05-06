@@ -20,10 +20,10 @@ function Chatbot() {
       recorder.onstop = async () => {
         const audioBlob = new Blob(chunks, { type: 'audio/mp3' });
         const formData = new FormData();
-        formData.append('file', audioBlob, 'voice_input.mp3');
+        formData.append('audio_file', audioBlob, 'audio_file.mp3');
 
         try {
-          const response = await axios.post('/voice_chat', formData, {
+          const response = await axios.post('/chatbot', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
             responseType: 'blob'
           });
@@ -53,8 +53,8 @@ function Chatbot() {
   const handleTextQuery = async () => {
     if (!query.trim()) return;
     try {
-      const res = await axios.get('/text_chat', {
-        params: { q: query }
+      const res = await axios.get('/chatbot', {
+        params: { query: query }
       });
       setChatHistory(prev => [...prev, { query, response: res.data.response }]);
       setQuery('');

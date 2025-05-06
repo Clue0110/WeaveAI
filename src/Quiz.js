@@ -7,6 +7,7 @@ function Quiz() {
   const location = useLocation();
   const navigate = useNavigate();
   const { module, submodule } = location.state || {};
+  // const {save} = {False};
   const [questions, setQuestions] = useState({});
   const [selectedOptions, setSelectedOptions] = useState({});
   const [showAnswers, setShowAnswers] = useState(false);
@@ -14,9 +15,7 @@ function Quiz() {
   useEffect(() => {
     const fetchQuizData = async () => {
       try {
-        const response = await axios.get('/quiz', {
-          params: { module, submodule }
-        });
+        const response = await axios.post('/quiz', { module, submodule, 'save':false });
         setQuestions(response.data.content);
         console.log(questions)
       } catch (error) {

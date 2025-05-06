@@ -94,11 +94,11 @@ async def generate_content(request: Response):
         return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=500)
     
 @app.get("/content")
-async def get_submodule_content(request: Request):
+def get_submodule_content(module: str, submodule:str):
     try:
-        request_payload=await request.json()
-        module=request_payload["module"]
-        submodule=request_payload["submodule"]
+        #request_payload=request.json()
+        #module=request.args.get("module")
+        #submodule=request.args.get("submodule")
         module_code=f"content_{module}_{submodule}"
         content=fetch_submodule_content(module_code)
         print(content)
@@ -115,16 +115,11 @@ async def generate_quiz(request: Request):
         request_payload=await request.json()
         module=request_payload["module"]
         submodule=request_payload["submodule"]
-        print("Here1")
         save_quiz=request_payload["save"]
-        print("Here2")
         module_code=f"quiz_{module}_{submodule}"
-        print("Here3")
         course_config=get_course_config()
         course_config.pop("_id",None)
-        print("Here4")
         collection_name=course_config[str(module)]["submodules"][str(submodule)]["mongo_db_details"]["collection_name"]
-        print("Here5")
         quiz_content=generate_submodule_quiz(mdb_collection_name=collection_name)
         print(f"Generated Submodule Quiz for {module_code}")
         if save_quiz==True:
@@ -142,8 +137,8 @@ async def generate_quiz(request: Request):
 async def get_quiz(request: Request):
     try:
         request_payload=await request.json()
-        module=request_payload["module"]
-        submodule=request_payload["submodule"]
+        module=await request.args.get("module")
+        submodule=await request.args.get("submodule")
         module_code=f"quiz_{module}_{submodule}"
         quiz_content=get_submodule_quiz(module_code=module_code)
         response_payload={"message":"Succesfully Retrieved Submodule Quiz",
@@ -154,11 +149,11 @@ async def get_quiz(request: Request):
         return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=500)
 
 @app.get("/podcast")
-async def get_podcast_script(request: Request):
+async def get_podcast_script(module: str, submodule: str):
     try:
-        request_payload=await request.json()
-        module=request_payload["module"]
-        submodule=request_payload["submodule"]
+        #request_payload=await request.json()
+        #module=await request.args.get("module")
+        #submodule=await request.args.get("submodule")
         module_code=f"podcast_{module}_{submodule}"
         course_config=get_course_config()
         collection_name=course_config[str(module)]["submodules"][str(submodule)]["mongo_db_details"]["collection_name"]
@@ -171,11 +166,11 @@ async def get_podcast_script(request: Request):
         return Response(content=json.dumps(response_payload, indent=4), media_type="application/json", status_code=500)
     
 @app.get("/chatbot")
-async def get_chatbot_response(request: Request):
+async def get_chatbot_response(query: str):
     try:
-        request_payload=await request.json()
+        #request_payload=await request.json()
         #print(request_payload,type(request_payload))
-        query=request_payload["query"]
+        #query=request.args.get("query")
         query_response=answer_course_query(query=query, with_history=True)
         response_payload={"message":"Succesfully Retrieved Response From Chatbot",
                           "response":query_response}
@@ -289,7 +284,7 @@ async def post_podcast(request: Request):
         submodule=request_payload["submodule"]
         module_code=f"podcast_{module}_{submodule}"
         course_config=get_course_config()
-        collection_name=course_config[module]["submodules"][submodule]["mongo_db_details"]
+        collection_name=course_config[str(module)]["submodules"][str(submodule)]["mongo_db_details"]["collection_name"]
         podcast_path=create_podcast(module=module,sub_module=submodule,mdb_collection_name=collection_name)
 
         logger.info(f"File found. Sending '{podcast_path}'...")

@@ -16,79 +16,16 @@ function CourseContent() {
     );
   };
 
-  // useEffect(() => {
-  //   const fetchCoursePlan = async () => {
-  //     try {
-  //       const response = await axios.get('/get_course_plan');
-  //       setCoursePlanData(response.data.data);
-  //     } catch (error) {
-  //       console.error('Failed to fetch course plan:', error);
-  //     }
-  //   };
-  //   fetchCoursePlan();
-  // }, []);
-
   useEffect(() => {
-    // Simulate fetching data
-    const fetchedData = {
-      "data": {
-        "1": {
-          "module_number": 1,
-          "module_title": "Introduction to UX Design",
-          "submodules": {
-            "1": {
-              "module_number": 1,
-              "module_title": "What is UX Design?"
-            },
-            "2": {
-              "module_number": 2,
-              "module_title": "UX vs UI: Understanding the Difference"
-            },
-            "3": {
-              "module_number": 3,
-              "module_title": "The UX Design Process"
-            }
-          }
-        },
-        "2": {
-          "module_number": 2,
-          "module_title": "User Research Methods",
-          "submodules": {
-            "1": {
-              "module_number": 1,
-              "module_title": "User Interviews"
-            },
-            "2": {
-              "module_number": 2,
-              "module_title": "Surveys and Questionnaires"
-            },
-            "3": {
-              "module_number": 3,
-              "module_title": "Persona Development"
-            }
-          }
-        },
-        "3": {
-          "module_number": 3,
-          "module_title": "Wireframing and Prototyping",
-          "submodules": {
-            "1": {
-              "module_number": 1,
-              "module_title": "Sketching Interfaces"
-            },
-            "2": {
-              "module_number": 2,
-              "module_title": "Low-Fidelity Wireframes"
-            },
-            "3": {
-              "module_number": 3,
-              "module_title": "Interactive Prototypes"
-            }
-          }
-        }
+    const fetchCoursePlan = async () => {
+      try {
+        const response = await axios.get('/courseplan');
+        setCoursePlanData(response.data.data);
+      } catch (error) {
+        console.error('Failed to fetch course plan:', error);
       }
     };
-    setCoursePlanData(fetchedData.data);
+    fetchCoursePlan();
   }, []);
 
   return (
@@ -210,12 +147,10 @@ function CourseContent() {
                         onClick={async () => {
                           try {
                             console.log("Fine0")
-                            const response = await axios.get('/get_podcast', {
-                              params: {
+                            const response = await axios.post('/podcast', {
                                 module: module.module_number,
                                 submodule: lesson.module_number
-                              },
-                              responseType: 'blob'
+                              //responseType: 'blob'
                             });
                             console.log("Fine1")
                             const filename = `podcast_module${module.module_number}_submodule${lesson.module_number}.mp3`;

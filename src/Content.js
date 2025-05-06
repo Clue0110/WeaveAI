@@ -14,7 +14,7 @@ function Content() {
         const response = await axios.get('/content', {
           params: { module, submodule }
         });
-        setHtmlContent(response.data.html);
+        setHtmlContent(response.data.content);
       } catch (error) {
         console.error('Failed to fetch content:', error);
       }

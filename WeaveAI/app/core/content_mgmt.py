@@ -371,7 +371,9 @@ def convert_script_to_speech(role: str, text: str, temp_dir: str, speaker_info: 
 
 def create_podcast(module=None,sub_module=None,mdb_collection_name=None):
     podcast_payload=generate_podcast_episode(module,sub_module,mdb_collection_name)
+    print("Generated Podcast Script")
     speaker_info=initialize_podcast_speakers()
+    print("Creating Podcast MP3")
     podcast_path=create_podcast_mp3(podcast_payload["segments"], speaker_info, f"{module}_{sub_module}")
     return podcast_path
 
